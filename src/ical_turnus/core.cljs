@@ -31,6 +31,21 @@
       (ls/set! (d2s k) v))))
 
 
+;; creates a temporary link with uri-encoded file content. allows
+;; download without resorting to a server or real file.
+;;
+;; see https://stackoverflow.com/questions/3665115/create-a-file-in-memory-for-user-to-download-not-through-server
+(defn download! [filename content mime]
+  (let [el (doto (.createElement js/document "a")
+             (.setAttribute "href" (str "data:" mime ";charset=utf-8,"
+                                     (js/encodeURIComponent content)))
+             (.setAttribute "download" filename))]
+    (set! (.-display (.-style el)) "none")
+    (set! (.-innerHtml el) "foool")
+    (.appendChild (.-body js/document) el)
+    (.click el)
+    (.removeChild (.-body js/document) el)))
+
 (defn day-after [date]
   (tm/plus date (tm/days 1)))
 
@@ -120,7 +135,33 @@
 
 ;;(set! (.-testdate js/window) (tm/date-time 2017 1 1))
 
-(js/encodeURIComponent "hei sann")
+
+;; thanks to:
+;; - https://theeventscalendar.com/support/forums/topic/ics-how-to-specify-all-day-event/
+;; - https://en.wikipedia.org/wiki/ICalendar
+;;
+;; but not really https://tools.ietf.org/html/rfc5545 because it's way
+;; too much to read.
+(defn generate-turnus-ics [turnus]
+  (clojure.string/join
+    "\n"
+    (concat
+      ["BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//ingurnus
+"]
+      (for [[d label] turnus]
+        (and label
+          (let [s (d2s d "YYYYMMdd")]
+            (str "BEGIN:VEVENT
+UID:" s "@ingurnus
+DTSTART;VALUE=DATE:" s "
+SUMMARY:" label "
+END:VEVENT
+"))))
+      ["END:VCALENDAR"])))
+
+;;(println (generate-turnus-ics (:turnus @app-state)))
 
 (defn render-calendar []
   [:table {:on-key-press (fn [event] (mark! (:cursor @app-state)
@@ -155,7 +196,15 @@
    (render-calendar)
    [:button {:on-click (fn [] (swap! app-state update-in [:scrollsize]
                                 (fn [ss] (+ ss 25))))}
-    "load more"]])
+    "load more"]
+   [:div "Last ned "
+    [:a {:href "#"
+         :on-click
+         (fn [e]
+           (let [ics (generate-turnus-ics (:turnus @app-state))]
+             (download! "one.ics" ics "text/calendar")))}
+     "her"]]])
+
 
 (reagent/render-component [hello-world]
   (. js/document (getElementById "app")))
