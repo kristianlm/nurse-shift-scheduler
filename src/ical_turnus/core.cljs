@@ -1,49 +1,29 @@
 (ns ical-turnus.core
   (:require [reagent.core :as reagent :refer [atom]]
             [cljs-time.core :as tm]
-            [cljs-time.format :as fm]))
+            [cljs-time.format :as fm]
+            [cljs-time.extend] ;; make = work
+            [ical-turnus.local-storage :as ls]))
 
 (enable-console-print!)
-
-(defn ls-set!
-  "Set `key' in browser's localStorage to `val`."
-  [key val]
-  (.setItem (.-localStorage js/window) key val))
-
-(defn ls-get
-  "Returns value of `key' from browser's localStorage."
-  [key]
-  (.getItem (.-localStorage js/window) key))
-
-(defn ls-remove!
-  "Remove the browser's localStorage value for the given `key`"
-  [key]
-  (.removeItem (.-localStorage js/window) key))
-
-;; get all localStorage keys as a list of strings
-(defn ls-keys []
-  (map
-    (fn [key] (.key (.-localStorage js/window) key))
-    (range (.-length (.-localStorage js/window)))))
-
-;; get all localStorage items as map
-(defn ls-items []
-  (into {} (map (fn [k] [k (ls-get k)]) (ls-keys))))
-
 
 ;; define your app data so that it doesn't get over-written on reload
 
 (defonce app-state
   (atom {:scrollsize 3
-         :turnus (ls-items)}))
-
+         :turnus
+         (into {}
+           (map (fn [[key label]]
+                  [(fm/parse (fm/formatter "YYYY-MM-dd") key) label])
+             (ls/items)))
+         :cursor (tm/date-time 2017 01 11)}))
 
 ;; TODO: make this faster by seeing which key have changed between o
 ;; and n.
 (add-watch app-state :local-storage
   (fn [k r o n]
-    (doseq [[k v] (:turnus @app-state)] (ls-set! k v))))
-
+    (doseq [[k v] (:turnus @app-state)]
+      (ls/set! (fm/unparse (fm/formatter "YYYY-MM-dd") k) v))))
 
 (defn day-after [date]
   (tm/plus date (tm/days 1)))
@@ -53,62 +33,129 @@
   ;; infinite sequence.
   (take n (iterate day-after (or date (tm/now)))))
 
+;; Day of Week (beacuse "e" format gives error)
+;; (dow (tm/date-time 2017 01 04)) => 3 (Wed)
+;; 1 is monday, 7 is sunday.
+(defn dow [d] ;; using cljs-time uses Google Closure Library's
+  (let [dowsun (.getDay d)]
+    (if (= dowsun 0) 6 (- dowsun 1))))
 
-(fm/unparse (fm/formatter "w") (tm/date-time 2017 01 02))
 
-;; date => string
+;; tested like this:
+;; (map (fn [w] (map (fn [d] [d (dow (w2d 2018 w d))]) (range 1 8))) (range 0 52))
+;; (w2d 2017 39 7) => Nov 1.
+(defn w2d [[y ww day]] ;; day is zero-indexed
+  (let [correction (+ (dow (tm/date-time y 01 04)) 3)
+        ordinal (- (+ (* ww 7) day )
+                  correction)]
+    (tm/date-time y 1 ordinal)))
+
+;; (w2d [2017 39 6])
+
+(defn d2w [d]
+  [(tm/year d)
+   (tm/week-number-of-year d)
+   (- (tm/day-of-week d) 1)])
+
+;; DATE => string
 (defn d2s [date & [fmt]]
   (fm/unparse (fm/formatter (or fmt "YYYY-MM-dd")) date))
 
-(defn choice [d]
-  (let [lbl (fn ;; getter/setter for d
-              ([] (get-in @app-state [:turnus d]))
-              ([l] (swap! app-state update-in [:turnus d]
-                     (fn [old]
-                       (println d " now " l)
-                       l))))
-        btn
-        (fn [label]
-          [:button {:on-click (fn [] (lbl label))
-                    :style {:background-color (if (= label (lbl))
-                                                "#888"
-                                                "#eee")}} label])]
-    [:div
-     (btn "D")
-     (btn "A")
-     (btn "N")
-     (btn "F")
-     (btn "?")]))
+(defn goto [d]
+  (swap! app-state update-in [:cursor]
+    (fn [old] (println "goto " d) d)))
+
+(defn keyboard-period [event]
+  (case (.-keyCode event)
+    (37) (tm/days   -1)
+    (38) (tm/weeks  -1)
+    (39) (tm/days    1)
+    (40) (tm/weeks   1)
+    nil))
+
+(defn keyboard-label [event]
+  ;;(.log js/console (.-key event))
+  (let [l (clojure.string/upper-case (.-key event))]
+    (case l
+      ("DELETE" " ") nil
+      l)))
+
+
+;; ;; our API is kinda silly.
+;; (defn w+ [from [y w d]]
+;;   (-> (tm/plus (w2d from)
+;;         (tm/years y)
+;;         (tm/weeks w)
+;;         (tm/days d))
+;;     (d2w)))
+
+;; (move! [0 0 1]) ;; next day
+(defn move-by! [period]
+  (and period
+    (swap! app-state update-in [:cursor]
+      (fn [d] (tm/plus d period)))))
+
+(defn mark! [cursor label]
+  (swap! app-state update-in [:turnus cursor]
+    (fn [old-label]
+      (println "mark " cursor " = " label)
+      label))
+  (move-by! (tm/days 1)))
+
+(defn render-day [d cursor? label]
+  [:div
+   { :class "daycell"
+    :style {:color (if (= (dow d) 6) "#b00" "#000")
+            :width 30 :height 30
+            :margin 0 :padding 7
+            :background-color
+            (if cursor?
+              "#f00"
+              (if (zero? (mod (.getMonth d) 2))
+                "#fff" "#ddd"))}
+    :on-click #(goto d)}
+   [:div {:style {:font-size 4}}       (.getDate d)] " "
+   [:div {:style {:text-align "center"}} label]])
+
+;;(set! (.-testdate js/window) (tm/date-time 2017 1 1))
+
+(js/encodeURIComponent "hei sann")
+
+(defn render-calendar []
+  [:table {:on-key-press (fn [event] (mark! (:cursor @app-state)
+                                       (keyboard-label event)))
+           :on-key-down (fn [event] (move-by! (keyboard-period event)))
+           :tab-index 0}
+   [:tbody
+    (let [cursor (:cursor @app-state)
+          turnus (:turnus @app-state)]
+      (for [[yyyy w]
+            (->> (range 1 (:scrollsize @app-state))
+              (map (fn [w] [2017 w])))]
+        [:tr {:key (str yyyy "W" w "-")
+              :style {:margin 0}}
+         [:td yyyy]
+         [:td [:em {:style {:color "#66a"
+                            :padding-right 10}}
+               w]]
+         [:td {:style {:font-size 13}}
+          (fm/unparse (fm/formatter "MMM") (w2d [yyyy w 1]))]
+
+         (for [day [0 1 2 3 4 5 6]]
+           (let [d (w2d [yyyy w day])]
+             [:td {:key day}
+              (render-day d
+                (= d cursor)
+                (get turnus d))]))]))]])
 
 (defn hello-world []
   [:div
    [:h1 "Ingurnus"]
-
-   [:div
-    [:table
-     [:tbody
-      (doall
-        (map
-          (fn [x]
-            (let [df (d2s x "YYYY-MM-dd")]
-              [:tr {:key df}
-               [:td (d2s x "w")]
-               [:td (d2s x "E")]
-               [:td (d2s x "YYYY-MM-dd")]
-               [:td (choice (d2s x))]]))
-          (days-since (:scrollsize @app-state))))]]]
-
+   (render-calendar)
    [:button {:on-click (fn [] (swap! app-state update-in [:scrollsize]
-                                (fn [ss] (+ ss 100))))}
+                                (fn [ss] (+ ss 25))))}
     "load more"]])
-
-;; (hello-world)
 
 (reagent/render-component [hello-world]
   (. js/document (getElementById "app")))
 
-(defn on-js-reload []
-  ;; optionally touch your app-state to force rerendering depending on
-  ;; your application
-  ;; (swap! app-state update-in [:__figwheel_counter] inc)
-)
