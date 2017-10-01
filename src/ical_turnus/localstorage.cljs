@@ -1,4 +1,4 @@
-(ns ical-turnus.local-storage
+(ns ical-turnus.localstorage
   (:refer-clojure :exclude [get set keys]))
 
 (defn set!

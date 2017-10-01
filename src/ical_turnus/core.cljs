@@ -3,7 +3,7 @@
             [cljs-time.core :as tm]
             [cljs-time.format :as fm]
             [cljs-time.extend] ;; make = work
-            [ical-turnus.local-storage :as ls]))
+            [ical-turnus.localstorage :as ls]))
 
 (enable-console-print!)
 
