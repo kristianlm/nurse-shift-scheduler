@@ -7,6 +7,11 @@
 
 (enable-console-print!)
 
+
+;; DATE => string
+(defn d2s [date & [fmt]]
+  (fm/unparse (fm/formatter (or fmt "YYYY-MM-dd")) date))
+
 ;; define your app data so that it doesn't get over-written on reload
 
 (defonce app-state
@@ -23,7 +28,8 @@
 (add-watch app-state :local-storage
   (fn [k r o n]
     (doseq [[k v] (:turnus @app-state)]
-      (ls/set! (fm/unparse (fm/formatter "YYYY-MM-dd") k) v))))
+      (ls/set! (d2s k) v))))
+
 
 (defn day-after [date]
   (tm/plus date (tm/days 1)))
@@ -57,9 +63,6 @@
    (tm/week-number-of-year d)
    (- (tm/day-of-week d) 1)])
 
-;; DATE => string
-(defn d2s [date & [fmt]]
-  (fm/unparse (fm/formatter (or fmt "YYYY-MM-dd")) date))
 
 (defn goto [d]
   (swap! app-state update-in [:cursor]
