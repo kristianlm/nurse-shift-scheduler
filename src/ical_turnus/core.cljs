@@ -109,16 +109,14 @@
   [:div
    { :class "daycell"
     :style {:color (if (= (dow d) 6) "#b00" "#000")
-            :width 30 :height 30
-            :margin 0 :padding 7
             :background-color
             (if cursor?
               "#f00"
               (if (zero? (mod (.getMonth d) 2))
                 "#fff" "#ddd"))}
     :on-click #(goto d)}
-   [:div {:style {:font-size 4}}       (.getDate d)] " "
-   [:div {:style {:text-align "center"}} label]])
+   [:div {:class "date"}       (.getDate d)] " "
+   [:div {:class "label"} label]])
 
 ;;(set! (.-testdate js/window) (tm/date-time 2017 1 1))
 
