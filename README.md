@@ -1,5 +1,8 @@
 # nurse-shift-scheduler
 
+Site is deployed
+[here!](https://kristianlm.github.io/nurse-shift-scheduler/resources/public/)
+
 ## Overview
 
 Quickly enter any single-letter code for each day. For example, `N`
