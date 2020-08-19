@@ -1,20 +1,16 @@
 (import chicken.io 
-        chicken.time.posix
         chicken.string
-        srfi-13 fmt)
+        dt
+        srfi-13)
 
-(define (week->date
-         day  ;; 0 is sunday, 1 is monday etc
-         week ;; %W 2 is %V 1, and %V doesn't work
-         #!optional format 
-         year)
-  (time->string
-   (string->time
-    (conc "d" day "y"
-          (or year (string->number (time->string (seconds->local-time) "%Y")))
-          "w" (- week 1))
-    "d%wy%Yw%W")
-   (or format "%y.%m.%d")))
+(define (two n) ;; how to do printf "%02d"?
+  (let ((n (conc n)))
+    (conc (if (= 1 (string-length n)) "0" "") n)))
+
+(define (week->date year week day)
+  (unless (number? year) (error "invalid year: " year))
+  (receive (y m d) (d->ymd (ywd->d year week day))
+    (conc y (two m) (two d))))
 
 (define cal (read))
 (begin
@@ -30,7 +26,7 @@ PRODID:-//ingurnus
        (for-each
         (lambda (day shift)
           (unless (eq? shift #\F)
-            (let ((date (week->date day week "%Y%m%d")))
+            (let ((date (week->date 2020 week day)))
               (print "
 BEGIN:VEVENT
 UID:" date "@ingurnus
@@ -45,6 +41,7 @@ END:VCALENDAR"))
 
 
 ;;; alternative tabular output
+;; (import fmt)
 ;; (begin
 ;;   (fmt #t nl (fit 23) (fmt-join (lambda (x) (fit/left 4 (upcase x)))
 ;;                                 `(m t o t f l s)) nl)
