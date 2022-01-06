@@ -25,8 +25,8 @@ PRODID:-//ingurnus
        (unless (= 7 (length shifts)) (error "invalid week shift spec" row))
        (for-each
         (lambda (day shift)
-          (unless (eq? shift #\F)
-            (let ((date (week->date 2020 week day)))
+          (unless (eq? (char-downcase shift) #\f)
+            (let ((date (week->date 2022 week day)))
               (print "
 BEGIN:VEVENT
 UID:" date "@ingurnus
@@ -39,8 +39,7 @@ END:VEVENT"))))
   (print "
 END:VCALENDAR"))
 
-
-;;; alternative tabular output
+;; ;; alternative tabular output
 ;; (import fmt)
 ;; (begin
 ;;   (fmt #t nl (fit 23) (fmt-join (lambda (x) (fit/left 4 (upcase x)))
@@ -49,11 +48,10 @@ END:VCALENDAR"))
 ;;    (lambda (row)
 ;;      (let ((week (car row))
 ;;            (days (string->list (symbol->string (cadr row)))))
-;;       
 ;;        (fmt #t
 ;;             (fit 23 "k:" (fit/left 2 week) " "
-;;                  (week->date 1 week) "-"
-;;                  (week->date 0 week) " ")
+;;                  (week->date 2022 1 week) "-"
+;;                  (week->date 2022 0 week) " ")
 ;;             (fmt-join (cut fit/left 4 <>) days)
 ;;             nl)))
 ;;    cal))
