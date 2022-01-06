@@ -33,7 +33,7 @@ UID:" date "@ingurnus
 DTSTART;VALUE=DATE:" date #|20171023|# "
 SUMMARY:" shift "
 END:VEVENT"))))
-        '(1 2 3 4 5 6 0)
+        '(1 2 3 4 5 6 7)
         shifts)))
    cal)
   (print "
